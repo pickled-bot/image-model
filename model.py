@@ -1,11 +1,21 @@
 import tensorflow as tf
 from tensorflow import keras
-from keras.layers import Dense, Reshape, Flatten, BatchNormalization, LeakyReLU, Conv2DTranspose, Input
+from keras.layers import Dense, Reshape, Flatten, BatchNormalization, LeakyReLU, Conv2DTranspose, Input, Conv2D, Dropout
 from keras.models import Sequential, Model
 from keras.optimizers import Adam
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import pyplot
+
+latent_dim = 100
+n_epochs = 100
+n_batch = 64
+input_images = Input(shape=(100), name='input_images')
+height = 28
+width = 28
+channels = 3
+img_shape = (height, width, channels)
+
 
 #create teslorflow session
 session = tf.compat.v1.Session()
@@ -44,15 +54,36 @@ def build_generator(latent_dim):
 #discriminator will take in an image and output a probability of whether it is real or fake
 def build_discriminator(img_shape):
   model = Sequential()
-  model.add(Flatten(input_shape=img_shape))
-  model.add(Dense(128, activation='relu'))
+  input_tensor = Input(shape=img_shape)
+  x = Flatten()(input_tensor)
+  x = Dense(128, activation='relu')(x)
+  
+  model.add(Conv2D(32, kernel_size=3, strides=(2, 2), padding='same', input_shape=img_shape))
+  model.add(LeakyReLU(alpha=0.2))
+  model.add(Dropout(0.25))
+
+  model.add(Conv2D(64, kernel_size=3, strides=(2, 2), padding='same'))
+  model.add(BatchNormalization())
+  model.add(LeakyReLU(alpha=0.2))
+  model.add(Dropout(0.25))
+
+  model.add(Conv2D(128, kernel_size=3, strides=(2, 2), padding='same'))
+  model.add(LeakyReLU(alpha=0.2))
+  model.add(Dropout(0.25))
+
+  model.add(Conv2D(256, kernel_size=3, strides=(1, 1), padding='same'))
+  model.add(LeakyReLU(alpha=0.2))
+  model.add(Dropout(0.25))
+
+  model.add(Flatten())
+  # model.add(Dense(128, input_shape=img_shape))
+  # model.add(Dense(128, activation='relu'))
   model.add(Dense(1, activation='sigmoid'))
   return model
 
 #build the GAN
 def build_gan(generator, discriminator):
   #compile discriminator
-  # discriminator = build_discriminator((28,28,1))
   discriminator.compile(loss='binary_crossentropy', optimizer=Adam(), metrics=['accuracy'])
 
   #compile generator
@@ -132,22 +163,33 @@ def train(gan, discriminator, generator, latent_dim, n_epochs=100, n_batch=64):
 #normalize pixel values
 x_train = (x_train.astype('float32') - 127.5) / 127.5
 x_train = np.expand_dims(x_train, axis=3)
-
-latent_dim = 100
-n_epochs = 100
-n_batch = 64
+x_train = np.repeat(x_train, 3, axis=3)
 
 #build the generator
 generator = build_generator(latent_dim)
 
 #build the discriminator
-discriminator = build_discriminator((28,28,1))
+discriminator = build_discriminator(img_shape=(28,28,1))
 
+input_latent = Reshape((latent_dim,))(input_images)
 #build the gan
-gan = build_gan(generator, discriminator)
 
-#
+
 graph = tf.Graph()
+
+generated_images_tensor = generator(input_latent)
+model_output_tensor = discriminator(generated_images_tensor)
+
+gan_input_images = Input(shape=(latent_dim), name='gan_input_images')
+gan_output = discriminator(generator(gan_input_images))
+
+gan = build_gan(generator, discriminator)
+## or do i want this
+gan2 = tf.keras.models.Model(gan_input_images, gan_output)
+
+gan3 = Model(input_images, model_output_tensor)
+
+
 
 # with graph.as_default():
 #   placeholder_tensor = tf.compat.v1.placeholder(tf.float32, shape=(None, 100), name='Placeholder/_1')
@@ -161,12 +203,15 @@ graph = tf.Graph()
 generator.compile(loss='binary_crossentropy', optimizer='adam')
 discriminator.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 gan.compile(loss='binary_crossentropy', optimizer='adam')
+gan2.compile(loss='binary_crossentropy', optimizer='adam')
 
 #train the model
 #trains gan for 'n_epochs' epochs, using batches of size n_batch
 # during training, gan will generate fake images to try to fool discriminator
 # discriminator will be trained on both real and fake images to learn to distinguish between them
 train(gan, discriminator, generator, latent_dim, n_epochs=n_epochs, n_batch=n_batch)
+train(gan2, discriminator, generator, latent_dim, n_epochs=n_epochs, n_batch=n_batch)
+train(gan3, discriminator, generator, latent_dim, n_epochs=n_epochs, n_batch=n_batch)
 
 #generate 25 random images
 latent_points = generate_latent_points(latent_dim, 25)
