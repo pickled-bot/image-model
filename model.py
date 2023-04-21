@@ -16,7 +16,6 @@ width = 28
 channels = 3
 img_shape = (height, width, channels)
 
-
 #create teslorflow session
 session = tf.compat.v1.Session()
 
@@ -49,8 +48,6 @@ def build_generator(latent_dim):
 
   return Model(inputs=input_tensor, outputs=output_tensor)
 
-
-
 #discriminator will take in an image and output a probability of whether it is real or fake
 def build_discriminator(img_shape):
   model = Sequential()
@@ -76,8 +73,6 @@ def build_discriminator(img_shape):
   model.add(Dropout(0.25))
 
   model.add(Flatten())
-  # model.add(Dense(128, input_shape=img_shape))
-  # model.add(Dense(128, activation='relu'))
   model.add(Dense(1, activation='sigmoid'))
   return model
 
@@ -87,7 +82,6 @@ def build_gan(generator, discriminator):
   discriminator.compile(loss='binary_crossentropy', optimizer=Adam(), metrics=['accuracy'])
 
   #compile generator
-  # generator = build_generator(100)
   generator.compile(loss='binary_crossentropy', optimizer=Adam())
 
   #compile model
@@ -127,12 +121,14 @@ def generate_fake_samples(generator, latent_dim, n_samples):
 def plot_images(images):
   fig, axs = plt.subplots(5, 5)
   count = 0
+
   for i in range(5):
       for j in range(5):
-          axs[i,j].imshow(images[count, :, :, 0], cmap='pink')
+          axs[i,j].imshow(images[count, :, :, 0], cmap='gist_rainbow_r')
           axs[i,j].axis('off')
           count += 1
-  plt.show()
+  # plt.savefig(f'{i}', f'gan_generated_image{i}.png')
+  plt.show(block=True)
 
 #train the GAN
 
@@ -185,7 +181,7 @@ gan_output = discriminator(generator(gan_input_images))
 
 gan = build_gan(generator, discriminator)
 ## or do i want this
-gan2 = tf.keras.models.Model(gan_input_images, gan_output)
+gan2 = Model(gan_input_images, gan_output)
 
 gan3 = Model(input_images, model_output_tensor)
 
@@ -204,6 +200,7 @@ generator.compile(loss='binary_crossentropy', optimizer='adam')
 discriminator.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
 gan.compile(loss='binary_crossentropy', optimizer='adam')
 gan2.compile(loss='binary_crossentropy', optimizer='adam')
+gan3.compile(loss='binary_crossentropy', optimizer='adam')
 
 #train the model
 #trains gan for 'n_epochs' epochs, using batches of size n_batch
